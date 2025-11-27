@@ -4,7 +4,7 @@ trigger:
       - main
 
 pool:
-  name: 'migration'
+  name: 'migration'   # your self-hosted pool
 
 variables:
   AWS_REGION: 'ap-south-1'
@@ -12,6 +12,7 @@ variables:
   JAR_FILE: 'build/libs/jb-hello-world-0.1.0.jar'
   S3_BUCKET: 'sachin-s3-lambda-bucket111'
   S3_KEY: 'lambda-builds/jb-hello-world-0.1.0.jar'
+  AWS_SERVICE_CONNECTION: 'S3_Lmabda'   # change if your service connection name differs
 
 stages:
 - stage: Build
@@ -48,24 +49,64 @@ stages:
   - job: UploadJob
     displayName: 'S3 Upload'
     steps:
-    # Download the artifact published in the Build stage
+    # download the published artifact (makes jar available on this job agent)
     - download: current
       artifact: drop
 
+    # Install aws cli if missing (idempotent check). Works for typical Linux agents.
     - script: |
+        echo ">>> Check for aws CLI"
+        if command -v aws >/dev/null 2>&1; then
+          echo "aws found: $(aws --version)"
+        else
+          echo "aws not found — installing AWS CLI v2"
+          # ensure unzip exists
+          if ! command -v unzip >/dev/null 2>&1; then
+            echo "unzip not present — installing unzip (may require sudo)"
+            sudo apt-get update -y || true
+            sudo apt-get install -y unzip || true
+          fi
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -o awscliv2.zip
+          sudo ./aws/install || (echo "install failed"; exit 1)
+          echo "installed: $(aws --version)"
+        fi
+      displayName: 'Ensure AWS CLI installed'
+
+    - script: |
+        echo ">>> Agent info"
+        uname -a
+        free -h || true
+      displayName: 'Debug: agent info'
+
+    - script: |
+        echo ">>> Check downloaded artifact path"
         echo "Pipeline.Workspace: $(Pipeline.Workspace)"
-        echo "Checking downloaded artifact path: $(Pipeline.Workspace)/drop/$(JAR_FILE)"
+        echo "Expect jar at: $(Pipeline.Workspace)/drop/$(JAR_FILE)"
         ls -lah $(Pipeline.Workspace)/drop/$(JAR_FILE) || true
+        echo "Size (bytes):"
+        stat -c%s $(Pipeline.Workspace)/drop/$(JAR_FILE) || true
       displayName: 'Debug: check downloaded artifact'
 
+    # Test AWS connectivity using AWSCLI@1 (uses service connection to inject creds)
     - task: AWSCLI@1
-      displayName: 'Upload JAR to S3'
+      displayName: 'Test AWS connectivity: list bucket'
       inputs:
-        awsCredentials: 'S3_Lmabda'          # <-- your Azure DevOps service connection
+        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
+        regionName: '$(AWS_REGION)'
+        command: 's3'
+        subCommand: 'ls'
+        arguments: 's3://$(S3_BUCKET)'
+
+    # Upload jar (disable progress to avoid CI progress-bar stalls)
+    - task: AWSCLI@1
+      displayName: 'Upload JAR to S3 (--no-progress)'
+      inputs:
+        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
         regionName: '$(AWS_REGION)'
         command: 's3'
         subCommand: 'cp'
-        arguments: '$(Pipeline.Workspace)/drop/$(JAR_FILE) s3://$(S3_BUCKET)/$(S3_KEY)'
+        arguments: '$(Pipeline.Workspace)/drop/$(JAR_FILE) s3://$(S3_BUCKET)/$(S3_KEY) --no-progress'
 
 - stage: DeployLambda
   displayName: 'Deploy to AWS Lambda'
@@ -77,7 +118,7 @@ stages:
     - task: AWSCLI@1
       displayName: 'Update Lambda (from S3)'
       inputs:
-        awsCredentials: 'S3_Lmabda'
+        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
         regionName: '$(AWS_REGION)'
         command: 'lambda'
         subCommand: 'update-function-code'
@@ -86,7 +127,7 @@ stages:
     - task: AWSCLI@1
       displayName: 'Verify Lambda (get-function)'
       inputs:
-        awsCredentials: 'S3_Lmabda'
+        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
         regionName: '$(AWS_REGION)'
         command: 'lambda'
         subCommand: 'get-function'
