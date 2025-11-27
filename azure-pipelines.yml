@@ -9,9 +9,8 @@ variables:
   AWS_REGION: 'ap-south-1'
   LAMBDA_FUNCTION_NAME: 'myLambda'
   JAR_FILE: 'build/libs/jb-hello-world-0.1.0.jar'
-  S3_BUCKET: 'sachin-s3-lambda-bucket'
-  S3_KEY: 'sachin-s3-lambda-bucket111/jb-hello-world-0.1.0.jar'
-
+  S3_BUCKET: 'sachin-s3-lambda-bucket111'
+  S3_KEY: 'lambda-builds/jb-hello-world-0.1.0.jar'
 stages:
 - stage: Build
   displayName: 'Build (Gradle)'
@@ -52,9 +51,7 @@ stages:
       inputs:
         awsCredentials: 'S3_Lmabda'                   # <-- Azure DevOps Service Connection name
         regionName: '$(AWS_REGION)'
-        command: 's3'
-        arguments: "cp $(System.DefaultWorkingDirectory)/${JAR_FILE} s3://${S3_BUCKET}/${S3_KEY}"
-
+        awsCommand: 's3 cp $(System.DefaultWorkingDirectory)/$(JAR_FILE) s3://$(S3_BUCKET)/$(S3_KEY)'
 - stage: DeployLambda
   displayName: 'Deploy to AWS Lambda'
   dependsOn: UploadToS3
