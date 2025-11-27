@@ -10,7 +10,7 @@ variables:
   LAMBDA_FUNCTION_NAME: 'myLambda'
   JAR_FILE: 'build/libs/jb-hello-world-0.1.0.jar'
   S3_BUCKET: 'sachin-s3-lambda-bucket'
-  S3_KEY: 'sachin-s3-lambda-bucket1/jb-hello-world-0.1.0.jar'
+  S3_KEY: 'sachin-s3-lambda-bucket111/jb-hello-world-0.1.0.jar'
 
 stages:
 - stage: Build
