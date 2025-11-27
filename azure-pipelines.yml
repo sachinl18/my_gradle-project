@@ -16,7 +16,7 @@ variables:
     value: 'myLambda'
 
   - name: JAR_FILE
-    value: 'build/libs/jb-hello-world-0.1.0.jar'
+    value: 'drop/jb-hello-world-0.1.0.jar'
 
   - name: S3_BUCKET
     value: 'sachin-s3-lambda-bucket111'
