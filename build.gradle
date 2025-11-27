@@ -1,32 +1,28 @@
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'application'
-
-mainClassName = 'hello.HelloWorld'
-
-// tag::repositories[]
+plugins {
+    id 'java'
+    id 'eclipse'
+    id 'application'
+}
+ 
+application {
+    mainClass = 'hello.HelloWorld'
+}
+ 
 repositories {
     mavenCentral()
 }
-// end::repositories[]
-
-// tag::jar[]
+ 
 jar {
-    baseName = 'jb-hello-world'
-    version = '0.1.0'
+    archiveBaseName.set('jb-hello-world')
+    archiveVersion.set('0.1.0')
 }
-// end::jar[]
-
-// tag::dependencies[]
-sourceCompatibility = 1.7
-targetCompatibility = 1.7
-
+ 
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+ 
 dependencies {
-    // Replace deprecated 'compile' with 'implementation'
     implementation 'joda-time:joda-time:2.2'
-    
-    // Replace deprecated 'testCompile' with 'testImplementation'
     testImplementation 'junit:junit:4.12'
 }
-// end::dependencies[]
-
