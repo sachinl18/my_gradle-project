@@ -49,18 +49,16 @@ stages:
   - job: UploadJob
     displayName: 'S3 Upload'
     steps:
-    # download the published artifact (makes jar available on this job agent)
     - download: current
       artifact: drop
 
-    # Install aws cli if missing (idempotent check). Works for typical Linux agents.
+    # Install aws cli if missing (idempotent)
     - script: |
         echo ">>> Check for aws CLI"
         if command -v aws >/dev/null 2>&1; then
           echo "aws found: $(aws --version)"
         else
           echo "aws not found — installing AWS CLI v2"
-          # ensure unzip exists
           if ! command -v unzip >/dev/null 2>&1; then
             echo "unzip not present — installing unzip (may require sudo)"
             sudo apt-get update -y || true
@@ -88,25 +86,20 @@ stages:
         stat -c%s $(Pipeline.Workspace)/drop/$(JAR_FILE) || true
       displayName: 'Debug: check downloaded artifact'
 
-    # Test AWS connectivity using AWSCLI@1 (uses service connection to inject creds)
+    # --- Use awsCommand form (Fix A) ---
     - task: AWSCLI@1
       displayName: 'Test AWS connectivity: list bucket'
       inputs:
         awsCredentials: '$(AWS_SERVICE_CONNECTION)'
         regionName: '$(AWS_REGION)'
-        command: 's3'
-        subCommand: 'ls'
-        arguments: 's3://$(S3_BUCKET)'
+        awsCommand: 's3 ls s3://$(S3_BUCKET)'
 
-    # Upload jar (disable progress to avoid CI progress-bar stalls)
     - task: AWSCLI@1
       displayName: 'Upload JAR to S3 (--no-progress)'
       inputs:
         awsCredentials: '$(AWS_SERVICE_CONNECTION)'
         regionName: '$(AWS_REGION)'
-        command: 's3'
-        subCommand: 'cp'
-        arguments: '$(Pipeline.Workspace)/drop/$(JAR_FILE) s3://$(S3_BUCKET)/$(S3_KEY) --no-progress'
+        awsCommand: 's3 cp $(Pipeline.Workspace)/drop/$(JAR_FILE) s3://$(S3_BUCKET)/$(S3_KEY) --no-progress'
 
 - stage: DeployLambda
   displayName: 'Deploy to AWS Lambda'
@@ -120,15 +113,11 @@ stages:
       inputs:
         awsCredentials: '$(AWS_SERVICE_CONNECTION)'
         regionName: '$(AWS_REGION)'
-        command: 'lambda'
-        subCommand: 'update-function-code'
-        arguments: '--function-name $(LAMBDA_FUNCTION_NAME) --s3-bucket $(S3_BUCKET) --s3-key $(S3_KEY)'
+        awsCommand: 'lambda update-function-code --function-name $(LAMBDA_FUNCTION_NAME) --s3-bucket $(S3_BUCKET) --s3-key $(S3_KEY)'
 
     - task: AWSCLI@1
       displayName: 'Verify Lambda (get-function)'
       inputs:
         awsCredentials: '$(AWS_SERVICE_CONNECTION)'
         regionName: '$(AWS_REGION)'
-        command: 'lambda'
-        subCommand: 'get-function'
-        arguments: '--function-name $(LAMBDA_FUNCTION_NAME)'
+        awsCommand: 'lambda get-function --function-name $(LAMBDA_FUNCTION_NAME)'
