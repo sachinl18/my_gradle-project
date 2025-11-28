@@ -7,8 +7,7 @@ pool:
   name: 'migration'   # your self-hosted pool
 
 variables:
-
-  - group: mumbai_azure
+  - group: mumbai_azure   # AWS credentials are here
   
   - name: AWS_REGION
     value: 'ap-south-1'
@@ -26,7 +25,7 @@ variables:
     value: 'lambda-builds/jb-hello-world-0.1.0.jar'
 
   - name: AWS_SERVICE_CONNECTION
-    value: 'S3_Lmabda'  # Replace with your actual service connection name
+    value: 'S3_Lmabda'
 
 stages:
 - stage: Build
@@ -97,23 +96,27 @@ stages:
   - job: DeployJob
     displayName: 'Update Lambda'
     steps:
-    - task: AWSCLI@1
+    # Use direct aws command for Lambda (avoids the AWSCLI@1 bug)
+    - script: |
+        echo ">>> Update Lambda from S3"
+        aws lambda update-function-code \
+          --function-name "$(LAMBDA_FUNCTION_NAME)" \
+          --s3-bucket "$(S3_BUCKET)" \
+          --s3-key "$(S3_KEY)" \
+          --region $(AWS_REGION)
       displayName: 'Update Lambda function code'
-      inputs:
-        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
-        regionName: '$(AWS_REGION)'
-        awsCommand: 'lambda'
-        awsSubCommand: 'update-function-code'
-        awsArguments: '--function-name $(LAMBDA_FUNCTION_NAME) --s3-bucket $(S3_BUCKET) --s3-key $(S3_KEY)'
       env:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
 
-    - task: AWSCLI@1
+    - script: |
+        echo ">>> Verify Lambda (get-function)"
+        aws lambda get-function \
+          --function-name "$(LAMBDA_FUNCTION_NAME)" \
+          --region $(AWS_REGION)
       displayName: 'Verify Lambda function'
-      inputs:
-        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
-        regionName: '$(AWS_REGION)'
-        awsCommand: 'lambda'
-        awsSubCommand: 'get-function'
-        awsArguments: '--function-name $(LAMBDA_FUNCTION_NAME)'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_REGION)
