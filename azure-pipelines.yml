@@ -7,6 +7,9 @@ pool:
   name: 'migration'   # your self-hosted pool
 
 variables:
+
+  - group: mumbai_azure
+  
   - name: AWS_REGION
     value: 'ap-south-1'
 
@@ -102,6 +105,9 @@ stages:
         awsCommand: 'lambda'
         awsSubCommand: 'update-function-code'
         awsArguments: '--function-name $(LAMBDA_FUNCTION_NAME) --s3-bucket $(S3_BUCKET) --s3-key $(S3_KEY)'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
 
     - task: AWSCLI@1
       displayName: 'Verify Lambda function'
