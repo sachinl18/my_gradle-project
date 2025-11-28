@@ -7,8 +7,6 @@ pool:
   name: 'migration'   # your self-hosted pool
 
 variables:
-  - group: mumbai_azure   # <-- variable group with AWS creds
-
   - name: AWS_REGION
     value: 'ap-south-1'
 
@@ -23,6 +21,9 @@ variables:
 
   - name: S3_KEY
     value: 'lambda-builds/jb-hello-world-0.1.0.jar'
+
+  - name: AWS_SERVICE_CONNECTION
+    value: 'S3_Lmabda'  # Replace with your actual service connection name
 
 stages:
 - stage: Build
@@ -63,46 +64,28 @@ stages:
       artifact: drop
 
     - script: |
-        echo ">>> Ensure aws CLI installed"
-        if command -v aws >/dev/null 2>&1; then
-          echo "aws found: $(aws --version)"
-        else
-          echo "Installing AWS CLI v2..."
-          if ! command -v unzip >/dev/null 2>&1; then
-            echo "Installing unzip..."
-            sudo apt-get update -y || true
-            sudo apt-get install -y unzip || true
-          fi
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip -o awscliv2.zip
-          sudo ./aws/install || (echo "aws install failed"; exit 1)
-          aws --version
-        fi
-      displayName: 'Install / verify aws cli'
-
-    - script: |
         echo ">>> Debug: check jar"
         echo "Pipeline.Workspace: $(Pipeline.Workspace)"
         ls -lah $(Pipeline.Workspace)/drop/$(JAR_FILE) || true
       displayName: 'Debug: check downloaded artifact'
 
-    - script: |
-        echo ">>> Test AWS connectivity (s3 ls)"
-        aws s3 ls "s3://$(S3_BUCKET)" --region $(AWS_REGION)
-      displayName: 'Test S3 connectivity (direct aws)'
-      env:
-        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_DEFAULT_REGION: $(AWS_REGION)
+    - task: AWSCLI@1
+      displayName: 'Test S3 connectivity'
+      inputs:
+        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
+        regionName: '$(AWS_REGION)'
+        awsCommand: 's3'
+        awsSubCommand: 'ls'
+        awsArguments: 's3://$(S3_BUCKET)'
 
-    - script: |
-        echo ">>> Upload jar to s3 (no progress)"
-        aws s3 cp "$(Pipeline.Workspace)/drop/$(JAR_FILE)" "s3://$(S3_BUCKET)/$(S3_KEY)" --no-progress --region $(AWS_REGION)
-      displayName: 'Upload JAR to S3 (direct aws)'
-      env:
-        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_DEFAULT_REGION: $(AWS_REGION)
+    - task: AWSCLI@1
+      displayName: 'Upload JAR to S3'
+      inputs:
+        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
+        regionName: '$(AWS_REGION)'
+        awsCommand: 's3'
+        awsSubCommand: 'cp'
+        awsArguments: '$(Pipeline.Workspace)/drop/$(JAR_FILE) s3://$(S3_BUCKET)/$(S3_KEY) --no-progress'
 
 - stage: DeployLambda
   displayName: 'Deploy to AWS Lambda'
@@ -111,26 +94,20 @@ stages:
   - job: DeployJob
     displayName: 'Update Lambda'
     steps:
-    - script: |
-        echo ">>> Update Lambda from S3"
-        aws lambda update-function-code \
-          --function-name "$(LAMBDA_FUNCTION_NAME)" \
-          --s3-bucket "$(S3_BUCKET)" \
-          --s3-key "$(S3_KEY)" \
-          --region $(AWS_REGION)
-      displayName: 'Update Lambda (direct aws)'
-      env:
-        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_DEFAULT_REGION: $(AWS_REGION)
+    - task: AWSCLI@1
+      displayName: 'Update Lambda function code'
+      inputs:
+        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
+        regionName: '$(AWS_REGION)'
+        awsCommand: 'lambda'
+        awsSubCommand: 'update-function-code'
+        awsArguments: '--function-name $(LAMBDA_FUNCTION_NAME) --s3-bucket $(S3_BUCKET) --s3-key $(S3_KEY)'
 
-    - script: |
-        echo ">>> Verify Lambda (get-function)"
-        aws lambda get-function \
-          --function-name "$(LAMBDA_FUNCTION_NAME)" \
-          --region $(AWS_REGION)
-      displayName: 'Verify Lambda (direct aws)'
-      env:
-        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
-        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
-        AWS_DEFAULT_REGION: $(AWS_REGION)
+    - task: AWSCLI@1
+      displayName: 'Verify Lambda function'
+      inputs:
+        awsCredentials: '$(AWS_SERVICE_CONNECTION)'
+        regionName: '$(AWS_REGION)'
+        awsCommand: 'lambda'
+        awsSubCommand: 'get-function'
+        awsArguments: '--function-name $(LAMBDA_FUNCTION_NAME)'
