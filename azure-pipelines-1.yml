@@ -4,7 +4,7 @@ trigger:
       - main
 
 pool:
-  vmImage: 'migration'
+  name: 'migration'
 
 variables:
   JAVA_HOME: '/usr/lib/jvm/msopenjdk-21'
