@@ -42,7 +42,7 @@ steps:
 # Rename JAR as per Jenkins style
 # -----------------------------
 - script: |
-    JAR="$(jar_file).jar"
+    JAR="$(jar_file)"
     JAR_VER="$(jar_file)-$(environmentName)-$(VERSION).jar"
     echo "Renaming $JAR -> $JAR_VER"
     mv build/libs/$JAR build/libs/$JAR_VER
