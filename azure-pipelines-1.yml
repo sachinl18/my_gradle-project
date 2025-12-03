@@ -4,7 +4,7 @@ trigger:
       - main
 
 pool:
-  name: 'Azure Pipelines'
+  name: 'Default'
 
 variables:
   JAVA_HOME: '/usr/lib/jvm/msopenjdk-21'
