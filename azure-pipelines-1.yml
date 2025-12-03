@@ -8,9 +8,8 @@ pool:
 
 variables:
   JAVA_HOME: '/usr/lib/jvm/msopenjdk-21'
-  PATH: '$(JAVA_HOME)/bin:$(PATH)'
   VERSION: $(Build.BuildId)
-
+  
   # Environment details (hardcoded for dev)
   environmentName: 'main'
   batchName: 'enate-l2-batch-job'
